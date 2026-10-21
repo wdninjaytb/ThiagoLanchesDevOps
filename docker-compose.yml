@@ -1,0 +1,68 @@
+name: thiagolanches
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - thiago_internal
+    ports:
+      - "127.0.0.1:3306:3306"
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ../ThiagoLanchesBackEnd
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../ThiagoLanchesBackEnd/.env
+    environment:
+      DB_HOST: mysql
+      PORT: "3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - thiago_internal
+
+  frontend:
+    build:
+      context: ../ThiagoLanchesFrontEnd
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - thiago_internal
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - thiago_internal
+volumes:
+  mysql_data:
+    name: thiagolanches_mysql_data
+
+networks:
+  thiago_internal:
+    driver: bridge
